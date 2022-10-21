@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ImageGallery } from './ImageGallery';
 import { Searchbar } from './Searchbar';
 import pixabay from '../services/pixabay-api';
@@ -12,77 +12,63 @@ const Status = {
   REJECTED: 'rejected',
 };
 
-export default class App extends Component {
-  state = {
-    imageName: '',
-    page: 0,
-    images: [],
-    error: null,
-    status: Status.IDLE,
-    showModal: false,
-    imageInModal: '',
+export const App = () => {
+  const [imageName, setImageName] = useState('');
+  const [page, setPage] = useState(0);
+  const [images, setImages] = useState([]);
+  const [, setError] = useState(null);
+  const [status, setStatus] = useState(Status.IDLE);
+  const [showModal, setShowModal] = useState(false);
+  const [imageInModal, setImageInModal] = useState('');
+
+  const handleFormSubmit = imageName => {
+    setImageName(imageName);
+    setPage(1);
   };
 
-  handleFormSubmit = imageName => {
-    this.setState({ imageName, page: 1 });
+  const loadMore = () => {
+    setPage(page + 1);
   };
 
-  loadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
+  useEffect(() => {
+    setStatus(Status.PENDING);
+    console.log(page);
+    pixabay
+      .fetchImg(imageName, page)
+      .then(data => {
+        return (
+        setImages(page===1 ? [...data.hits] : [...images, ...data.hits]),
+        setStatus(data.hits.length === 0 ? Status.REJECTED : Status.RESOLVED)
+        )})
+      .catch(error => setError(error), 
+      setStatus(Status.REJECTED));
+      // eslint-disable-next-line
+  }, [imageName, page]);
+
+  const toggleModal = () => {
+    setShowModal(!showModal);
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    const prevName = prevState.imageName;
-    const nextName = this.state.imageName;
-    const prevPage = prevState.page;
-    const page = this.state.page;
-
-    if (prevName !== nextName || page !== prevPage) {
-      this.setState({ status: Status.PENDING });
-        pixabay
-          .fetchImg(nextName, page)
-          .then(data => {
-            return this.setState(prevState => ({
-              images: prevName === nextName ? [...prevState.images, ...data.hits] : [...data.hits],
-              status:
-                data.hits.length === 0 ? Status.REJECTED : Status.RESOLVED,
-            }));
-          })
-          .catch(error => this.setState({ error, status: Status.REJECTED }));
-    }
-  }
-
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({
-      showModal: !showModal,
-    }));
+  const setActiveImage = largeImageURL => {
+    setImageInModal(largeImageURL);
+    toggleModal();
   };
 
-  setActiveImage = ( largeImageURL ) => {
-    this.setState({
-      imageInModal:  largeImageURL,
-    });
-    this.toggleModal();
-  };
+  return (
+    <div className="App">
+      <Searchbar onSubmit={handleFormSubmit} />
+      <ImageGallery
+        images={images}
+        status={status}
+        setActiveImage={setActiveImage}
+      />
+      <button className="Button" onClick={loadMore}>
+        Load more
+      </button>
 
-  render() {
-    const { images, status, showModal, imageInModal } = this.state;
-    return (
-      <div className='App'>
-        <Searchbar onSubmit={this.handleFormSubmit} />
-        <ImageGallery
-          images={images}
-          status={status}
-          setActiveImage={this.setActiveImage}
-        />
-        <button className='Button' onClick={this.loadMore}>Load more</button>
+      {showModal && <Modal url={imageInModal} onClose={toggleModal}></Modal>}
+    </div>
+  );
+};
 
-        {showModal && (
-          <Modal url={imageInModal} onClose={this.toggleModal}></Modal>
-        )}
-      </div>
-    );
-  }
-}
+export default App;
